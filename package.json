@@ -1,0 +1,14 @@
+{
+  "name": "stellar-passkey",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter demo dev",
+    "build": "pnpm -r --filter='!demo' build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm --filter @rohitaggarwal/passkey-sdk build && pnpm --filter @rohitaggarwal/wallets-kit-adapter build && pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

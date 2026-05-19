@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stellar Passkey Demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 680px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-top: 0; font-size: 0.9rem; }
+    section { border: 1px solid #ddd; border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
+    section.locked { opacity: 0.45; pointer-events: none; }
+    h2 { margin: 0 0 0.75rem; font-size: 1rem; font-weight: 700; }
+    pre { background: #f5f5f5; padding: 0.75rem; border-radius: 4px; overflow-x: auto; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; margin: 0.5rem 0 0; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+    .ok   { background: #d4edda; color: #155724; }
+    .warn { background: #fff3cd; color: #856404; }
+    .fail { background: #f8d7da; color: #721c24; }
+    .status { font-size: 0.85rem; color: #555; margin: 0.4rem 0 0; display: block; min-height: 1.2em; }
+    .status.err { color: #c0392b; }
+    .key-box { background: #fffbe6; border: 1px solid #f0d060; border-radius: 6px; padding: 0.75rem; margin: 0.6rem 0; font-size: 0.82rem; }
+    .key-box strong { display: block; margin-bottom: 0.25rem; }
+    .key-box code { word-break: break-all; font-size: 0.78rem; }
+    .key-box .warning { color: #856404; font-weight: 600; }
+    button { padding: 0.45rem 1rem; border-radius: 5px; border: 1px solid #aaa; background: #fff; cursor: pointer; font-size: 0.9rem; }
+    button:hover:not(:disabled) { background: #f0f0f0; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    a { color: #1a6bd0; }
+    #backup-setup { margin-top: 0.75rem; }
+    .step-label { font-size: 0.75rem; color: #888; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.3rem; }
+  </style>
+</head>
+<body>
+  <h1>Stellar Passkey Demo</h1>
+  <p class="subtitle">Testnet only &mdash; demonstrates the full create → sign → recover cycle using WebAuthn + Soroban.</p>
+
+  <!-- ── Step 0: Browser capabilities ─────────────────────────────────────── -->
+  <section id="capabilities">
+    <h2>Browser Capabilities</h2>
+    <div id="caps-output">Checking…</div>
+  </section>
+
+  <!-- ── Step 1: Create wallet + register backup key ──────────────────────── -->
+  <section id="register-section">
+    <div class="step-label">Step 1</div>
+    <h2>Create Passkey Wallet</h2>
+    <pk-register name="Demo Wallet"></pk-register>
+    <pre id="register-output" style="display:none"></pre>
+
+    <div id="backup-setup" style="display:none">
+      <div class="key-box">
+        <strong class="warning">⚠ Save this backup key before continuing</strong>
+        <p style="margin:0.25rem 0 0.4rem;font-size:0.82rem;">If you lose your passkey device, this Ed25519 secret key is your only recovery path.</p>
+        <strong>Public key:</strong><br><code id="backup-pub"></code>
+        <br><br>
+        <strong>Secret key (save this!):</strong><br><code id="backup-sec"></code>
+      </div>
+      <button id="register-backup-btn">Register Backup Key (passkey required)</button>
+      <span id="register-backup-status" class="status"></span>
+    </div>
+  </section>
+
+  <!-- ── Step 2: Sign with passkey ────────────────────────────────────────── -->
+  <section id="sign-section" class="locked">
+    <div class="step-label">Step 2</div>
+    <h2>Sign with Passkey</h2>
+    <p style="font-size:0.85rem;margin:0 0 0.6rem;">Signs a demo transaction (<code>add_backup</code> on your contract) using your passkey, then submits it to Testnet.</p>
+    <pk-sign id="pk-sign-el"></pk-sign>
+    <pre id="sign-output" style="display:none"></pre>
+  </section>
+
+  <!-- ── Step 3: Recover with backup key ──────────────────────────────────── -->
+  <section id="recover-section" class="locked">
+    <div class="step-label">Step 3</div>
+    <h2>Recover with Backup Key</h2>
+    <p style="font-size:0.85rem;margin:0 0 0.6rem;">Signs a separate demo transaction using your Ed25519 backup key instead of the passkey. Paste the secret key you saved in Step 1.</p>
+    <pk-recover id="pk-recover-el"></pk-recover>
+    <pre id="recover-output" style="display:none"></pre>
+  </section>
+
+  <!-- ── Step 4: Send XLM ─────────────────────────────────────────────────── -->
+  <section id="pay-section" class="locked">
+    <div class="step-label">Step 4 — Full wallet demo</div>
+    <h2>Send XLM from Smart Wallet</h2>
+    <p style="font-size:0.85rem;margin:0 0 0.8rem;">
+      Fund your contract account with test XLM, then sign a native token transfer with your passkey.
+      This exercises the full wallet flow — <em>the contract IS the account</em>.
+    </p>
+
+    <button id="fund-btn">Fund Wallet via Friendbot</button>
+    <span id="fund-status" class="status"></span>
+    <pre id="balance-output" style="display:none"></pre>
+
+    <div id="send-form" style="display:none;margin-top:1rem">
+      <p style="margin:0 0 0.4rem;font-size:0.85rem;font-weight:600;">Recipient address:</p>
+      <input id="recipient-input" type="text"
+        style="width:100%;font-family:monospace;font-size:0.78rem;padding:0.35rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px"
+        placeholder="G… or C… (testnet address)" />
+      <p style="margin:0.5rem 0 0.4rem;font-size:0.85rem;font-weight:600;">Amount (XLM):</p>
+      <input id="amount-input" type="number" value="1" min="0.0000001" step="1"
+        style="width:6em;padding:0.35rem;border:1px solid #ccc;border-radius:4px" />
+      <br><br>
+      <button id="send-btn">Sign &amp; Send (passkey required)</button>
+      <span id="send-status" class="status"></span>
+      <pre id="send-output" style="display:none"></pre>
+    </div>
+  </section>
+
+  <!-- ── Step 5: Kit integration ─────────────────────────────────────────── -->
+  <section id="kit-section" class="locked">
+    <div class="step-label">Step 5 — stellar-wallets-kit adapter</div>
+    <h2>Kit Integration Test</h2>
+    <p style="font-size:0.85rem;margin:0 0 0.6rem;">
+      Exercises <code>PasskeyModule</code> through the <code>StellarWalletsKit</code> static API.
+      <code>signTransaction</code> sets the Soroban auth entry; fee-payer signs separately.
+    </p>
+    <button id="kit-connect-btn">1. Get Address via Kit</button>
+    <span id="kit-connect-status" class="status"></span>
+    <br><br>
+    <button id="kit-sign-btn" disabled>2. Sign Transaction via Kit</button>
+    <span id="kit-sign-status" class="status"></span>
+    <pre id="kit-output" style="display:none"></pre>
+  </section>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
