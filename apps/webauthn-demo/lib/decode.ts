@@ -107,7 +107,10 @@ export function decodeRegistration(response: RegistrationResponseJSON): DecodedR
     const attestation = cborDecode(
       new Uint8Array(base64URLToBuffer(response.response.attestationObject)),
     ) as { authData: Uint8Array }
-    authDataBuffer = attestation.authData.buffer as ArrayBuffer
+    authDataBuffer = attestation.authData.buffer.slice(
+      attestation.authData.byteOffset,
+      attestation.authData.byteOffset + attestation.authData.byteLength,
+    ) as ArrayBuffer
   }
 
   const authData = parseAuthData(authDataBuffer)
