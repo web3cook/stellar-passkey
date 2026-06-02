@@ -153,8 +153,8 @@ export default function Page() {
         </p>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="w-80 shrink-0 border-r border-slate-800 overflow-y-auto">
+      <div className="flex flex-col md:flex-row flex-1 md:overflow-hidden">
+        <aside className="md:w-80 md:shrink-0 border-b md:border-b-0 md:border-r border-slate-800 md:overflow-y-auto">
           <ActionPanel
             credentialId={credentialId}
             status={status}
@@ -165,7 +165,7 @@ export default function Page() {
           />
         </aside>
 
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 md:overflow-hidden">
           <InspectionPanel
             activeView={activeView}
             registration={registration}

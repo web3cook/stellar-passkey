@@ -10,14 +10,14 @@ type Props = {
 export function InspectionPanel({ activeView, registration, authentication }: Props) {
   if (!activeView) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-500 text-sm">
-        Perform a ceremony on the left to inspect the WebAuthn response.
+      <div className="flex items-center justify-center py-16 md:h-full text-slate-500 text-sm">
+        Perform a ceremony above to inspect the WebAuthn response.
       </div>
     )
   }
 
   return (
-    <div className="overflow-y-auto h-full space-y-6 p-6 bg-slate-900 text-sm">
+    <div className="overflow-y-auto md:h-full space-y-6 p-6 bg-slate-900 text-sm">
       {activeView === 'registration' && registration && (
         <RegistrationView data={registration} />
       )}
