@@ -10,7 +10,7 @@ export function getKit(): SmartAccountKit {
     networkPassphrase: process.env.NEXT_PUBLIC_NETWORK_PASSPHRASE!,
     accountWasmHash: process.env.NEXT_PUBLIC_ACCOUNT_WASM_HASH!,
     webauthnVerifierAddress: process.env.NEXT_PUBLIC_WEBAUTHN_VERIFIER_ADDRESS!,
-    deployerSecret: 'SDOXPP7YMGNC54DL4HGR7XR4BLGLGGZ7ACBBT7M4JYVIXWH4OFOEUGO5',
+    deployerSecret: process.env.NEXT_PUBLIC_FEE_PAYER_SECRET,
     storage: new IndexedDBStorage(),
   })
   return _kit
