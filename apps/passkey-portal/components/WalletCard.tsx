@@ -50,7 +50,7 @@ export function WalletCard({ contractId, balance, loading }: WalletCardProps) {
             <div className="h-8 w-32 rounded-lg animate-pulse" style={{ background: 'rgba(255,255,255,0.06)' }} />
           ) : (
             <span className="text-3xl font-bold text-white">
-              {balance ?? '—'} <span className="text-lg" style={{ color: 'rgba(255,255,255,0.4)' }}>XLM</span>
+              {balance ?? '-'} <span className="text-lg" style={{ color: 'rgba(255,255,255,0.4)' }}>XLM</span>
             </span>
           )}
         </div>

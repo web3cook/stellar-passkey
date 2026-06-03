@@ -6,7 +6,7 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'SealPass — Smart Wallet',
+  title: 'SealPass - Smart Wallet',
   description: 'Your Stellar smart wallet, secured by passkey',
   icons: { icon: '/logo1.jpeg' },
 }

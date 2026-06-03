@@ -101,7 +101,7 @@ export function TransferModal({ onClose, onTransfer }: TransferModalProps) {
               className="w-full py-2.5 rounded-xl font-bold text-white mt-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               style={{ background: '#3b82f6' }}
             >
-              {status === 'pending' ? 'Signing with passkey…' : '🔑 Sign with Passkey'}
+              {status === 'pending' ? 'Sending...' : 'Send'}
             </button>
           </form>
         )}

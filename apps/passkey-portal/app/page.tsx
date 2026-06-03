@@ -7,8 +7,8 @@ import { getKit } from '@/lib/kit'
 import { setSession, markAuthed, clearWallet } from '@/lib/session'
 
 const FRIENDLY_ERRORS: Record<string, string> = {
-  NotAllowedError: 'Cancelled — try again',
-  InvalidStateError: 'Already registered — use Sign In instead',
+  NotAllowedError: 'Cancelled - try again',
+  InvalidStateError: 'Already registered - use Sign In instead',
   SecurityError: 'Requires HTTPS or localhost',
   NotSupportedError: 'Passkeys not supported in this browser',
   AbortError: 'Request was aborted',
@@ -60,7 +60,7 @@ export default function LandingPage() {
       const msg = err instanceof Error ? err.message : ''
       if (msg.includes('not found on-chain') || msg.includes('not been deployed')) {
         clearWallet()
-        setSignInError('Wallet not found on network — testnet may have reset. Please create a new wallet.')
+        setSignInError('Wallet not found on network - testnet may have reset. Please create a new wallet.')
       } else {
         setSignInError(toFriendlyError(err))
       }
@@ -99,6 +99,11 @@ export default function LandingPage() {
             No seed phrases. No complexity.
           </p>
         </div>
+
+        {/* Disclaimer */}
+        <p className="text-sm text-center w-full px-3 py-2 rounded-lg border" style={{ color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+          Create a wallet or sign in to read the RFP proposal.
+        </p>
 
         {/* CTA cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">

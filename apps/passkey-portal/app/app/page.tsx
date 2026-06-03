@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Horizon } from '@stellar/stellar-sdk'
+import { Keypair, TransactionBuilder, BASE_FEE, rpc as StellarRpc, xdr, Address, Operation } from '@stellar/stellar-sdk'
 import { SealLogo } from '@/components/SealLogo'
 import { WalletCard } from '@/components/WalletCard'
 import { TransferModal } from '@/components/TransferModal'
@@ -12,8 +12,10 @@ import { getKit } from '@/lib/kit'
 
 type Tab = 'rfp' | 'wallet'
 
-const HORIZON_URL = 'https://horizon-testnet.stellar.org'
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL!
+const NETWORK_PASSPHRASE = process.env.NEXT_PUBLIC_NETWORK_PASSPHRASE!
 const NATIVE_CONTRACT = process.env.NEXT_PUBLIC_NATIVE_TOKEN_CONTRACT!
+const ACCOUNT_WASM_HASH = process.env.NEXT_PUBLIC_ACCOUNT_WASM_HASH!
 
 export default function AppPage() {
   const router = useRouter()
@@ -33,12 +35,34 @@ export default function AppPage() {
   const fetchBalance = useCallback(async (addr: string) => {
     setBalanceLoading(true)
     try {
-      const server = new Horizon.Server(HORIZON_URL)
-      const account = await server.loadAccount(addr)
-      const native = account.balances.find((b) => b.asset_type === 'native')
-      setBalance(native ? parseFloat(native.balance).toFixed(2) : '0.00')
+      const rpcServer = new StellarRpc.Server(RPC_URL)
+      const balanceKey = xdr.ScVal.scvVec([
+        xdr.ScVal.scvSymbol('Balance'),
+        xdr.ScVal.scvAddress(Address.fromString(addr).toScAddress()),
+      ])
+      const data = await rpcServer.getContractData(NATIVE_CONTRACT, balanceKey)
+      const val = data.val.contractData().val()
+
+      // SAC stores balance as a map: { amount: i128, authorized: bool, clawback: bool }
+      const toXlm = (v: xdr.ScVal) => {
+        const i128 = v.i128()
+        const lo = BigInt(i128.lo().toString())
+        const hi = BigInt(i128.hi().toString())
+        return (Number((hi << BigInt(64)) | lo) / 10_000_000).toFixed(2)
+      }
+
+      if (val.switch().name === 'scvMap') {
+        const amountEntry = (val.map() ?? []).find(
+          e => e.key().switch().name === 'scvSymbol' && e.key().sym().toString() === 'amount'
+        )
+        setBalance(amountEntry ? toXlm(amountEntry.val()) : '0.00')
+      } else if (val.switch().name === 'scvI128') {
+        setBalance(toXlm(val))
+      } else {
+        setBalance('0.00')
+      }
     } catch {
-      setBalance('—')
+      setBalance('0.00')
     } finally {
       setBalanceLoading(false)
     }
@@ -54,12 +78,64 @@ export default function AppPage() {
   }
 
   async function handleFundWallet() {
+    if (!contractId) return
     setFunding(true)
     setFundError(null)
     try {
-      const kit = getKit()
-      await kit.fundWallet(NATIVE_CONTRACT)
-      if (contractId) await fetchBalance(contractId)
+      // Create a temporary keypair and fund it via Friendbot
+      const tempKeypair = Keypair.random()
+      const fbRes = await fetch(`https://friendbot.stellar.org?addr=${tempKeypair.publicKey()}`)
+      if (!fbRes.ok) throw new Error(`Friendbot failed: ${await fbRes.text()}`)
+
+      // Retry getting the account until the ledger closes
+      const rpcServer = new StellarRpc.Server(RPC_URL)
+      let sourceAccount
+      for (let i = 0; i < 10; i++) {
+        try {
+          sourceAccount = await rpcServer.getAccount(tempKeypair.publicKey())
+          break
+        } catch {
+          await new Promise(r => setTimeout(r, 2000))
+        }
+      }
+      if (!sourceAccount) throw new Error('Temp account not available after Friendbot')
+
+      // Build SAC transfer: temp keypair -> smart contract
+      const TRANSFER_STROOPS = BigInt(9000 * 10_000_000)
+      const transferFunc = xdr.HostFunction.hostFunctionTypeInvokeContract(
+        new xdr.InvokeContractArgs({
+          contractAddress: Address.fromString(NATIVE_CONTRACT).toScAddress(),
+          functionName: 'transfer',
+          args: [
+            xdr.ScVal.scvAddress(Address.fromString(tempKeypair.publicKey()).toScAddress()),
+            xdr.ScVal.scvAddress(Address.fromString(contractId).toScAddress()),
+            xdr.ScVal.scvI128(new xdr.Int128Parts({
+              lo: xdr.Uint64.fromString((TRANSFER_STROOPS & BigInt('0xFFFFFFFFFFFFFFFF')).toString()),
+              hi: xdr.Int64.fromString((TRANSFER_STROOPS >> BigInt(64)).toString()),
+            })),
+          ],
+        })
+      )
+
+      const tx = new TransactionBuilder(sourceAccount, {
+        fee: BASE_FEE,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      })
+        .addOperation(Operation.invokeHostFunction({ func: transferFunc, auth: [] }))
+        .setTimeout(30)
+        .build()
+
+      const simResult = await rpcServer.simulateTransaction(tx)
+      if ('error' in simResult) throw new Error(`Simulation failed: ${simResult.error}`)
+
+      const assembled = StellarRpc.assembleTransaction(tx, simResult).build()
+      assembled.sign(tempKeypair)
+
+      const submitResult = await rpcServer.sendTransaction(assembled)
+      if (submitResult.status === 'ERROR') throw new Error('Transaction submission failed')
+
+      await rpcServer.pollTransaction(submitResult.hash, { attempts: 15 })
+      await fetchBalance(contractId)
     } catch (err) {
       setFundError(err instanceof Error ? err.message : 'Funding failed')
     } finally {
@@ -71,7 +147,10 @@ export default function AppPage() {
     const kit = getKit()
     const session = getSession()
     if (!session) throw new Error('Session expired')
-    await kit.transfer(NATIVE_CONTRACT, recipient, parseFloat(amount))
+    // Restore kit state silently (passing both ids skips the passkey picker)
+    await kit.connectWallet({ contractId: session.contractId, credentialId: session.credentialId })
+    const result = await kit.transfer(NATIVE_CONTRACT, recipient, parseFloat(amount))
+    if (!result.success) throw new Error(result.error || 'Transfer failed')
     if (contractId) await fetchBalance(contractId)
   }
 
@@ -135,6 +214,21 @@ export default function AppPage() {
           <div className="flex flex-col gap-6">
             <WalletCard contractId={contractId} balance={balance} loading={balanceLoading} />
 
+            {/* Demo info */}
+            <div
+              className="rounded-2xl p-5 border flex flex-col gap-2"
+              style={{ background: 'rgba(59,130,246,0.05)', borderColor: 'rgba(59,130,246,0.2)' }}
+            >
+              <span className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(59,130,246,0.7)' }}>Demo Info</span>
+              {[
+                'This demo uses smart-account-kit by kalepail built on OpenZeppelin Soroban contracts.',
+                `WASM hash: ${ACCOUNT_WASM_HASH}`,
+                'Currently running on Stellar Testnet.',
+              ].map((line, i) => (
+                <p key={i} className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{line}</p>
+              ))}
+            </div>
+
             <div
               className="rounded-2xl p-6 border flex flex-col gap-5"
               style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
@@ -145,7 +239,7 @@ export default function AppPage() {
                   <div className="h-10 w-40 rounded-lg animate-pulse" style={{ background: 'rgba(255,255,255,0.06)' }} />
                 ) : (
                   <span className="text-4xl font-bold text-white">
-                    {balance ?? '—'} <span className="text-xl" style={{ color: 'rgba(255,255,255,0.4)' }}>XLM</span>
+                    {balance ?? '-'} <span className="text-xl" style={{ color: 'rgba(255,255,255,0.4)' }}>XLM</span>
                   </span>
                 )}
               </div>
@@ -164,7 +258,7 @@ export default function AppPage() {
                   className="px-5 py-2.5 rounded-xl font-bold text-sm border-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   style={{ color: '#3b82f6', borderColor: '#3b82f6', background: 'transparent' }}
                 >
-                  {funding ? 'Funding…' : 'Fund Wallet'}
+                  {funding ? 'Funding...' : 'Fund Wallet'}
                 </button>
                 <button
                   onClick={() => fetchBalance(contractId)}
