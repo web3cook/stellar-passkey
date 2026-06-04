@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { startAuthentication } from '@simplewebauthn/browser'
 import { SealLogo } from '@/components/SealLogo'
 import { getKit } from '@/lib/kit'
-import { setSession, markAuthed, clearWallet } from '@/lib/session'
+import { getSession, setSession, markAuthed, clearWallet } from '@/lib/session'
 
 const FRIENDLY_ERRORS: Record<string, string> = {
   NotAllowedError: 'Cancelled - try again',
@@ -45,14 +46,44 @@ export default function LandingPage() {
     setSignInError(null)
     try {
       const kit = getKit()
-      // fresh: true always shows the browser's native passkey picker so the
-      // user can choose which passkey (and therefore which wallet) to use.
-      const result = await kit.connectWallet({ fresh: true })
-      if (!result) {
-        setSignInError('Sign-in cancelled')
+
+      // Step 1: Show the passkey picker to get the credential ID.
+      // We do this manually so we can supply the correct contractId in step 2,
+      // bypassing kit's internal derivation (which uses deployerKeypair and would
+      // produce the wrong address for wallets created before the fee-payer patch).
+      const bytes = new Uint8Array(32)
+      crypto.getRandomValues(bytes)
+      const challenge = btoa(String.fromCharCode(...bytes))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+
+      let authResponse
+      try {
+        authResponse = await startAuthentication({ optionsJSON: { challenge, userVerification: 'preferred', timeout: 60000 } })
+      } catch (err) {
+        setSignInError(toFriendlyError(err))
         setSignInStatus('error')
         return
       }
+      const credentialId = authResponse.id
+
+      // Step 2: Find the contractId for this credential from our stored session.
+      const stored = getSession()
+      const contractId = stored?.credentialId === credentialId ? stored.contractId : undefined
+
+      if (!contractId) {
+        setSignInError('No wallet found for this passkey on this device. Please create a new wallet.')
+        setSignInStatus('error')
+        return
+      }
+
+      // Step 3: Connect with explicit IDs — bypasses derivation entirely.
+      const result = await kit.connectWallet({ credentialId, contractId })
+      if (!result) {
+        setSignInError('Sign-in failed')
+        setSignInStatus('error')
+        return
+      }
+
       setSession({ contractId: result.contractId, credentialId: result.credentialId })
       markAuthed()
       router.push('/app')
