@@ -118,26 +118,29 @@ const RFP_HTML = `
 <p><strong>Fallback 1:</strong> FIDO2 hardware security key: covers Firefox and Linux users</p>
 <p><strong>Fallback 2:</strong> Backup Ed25519 keypair: recovery path when all passkey devices are lost or inaccessible</p>
 
+<h3>Native Mobile Apps</h3>
+<p>Web-embedded flows cover most wallet surfaces, but native iOS and Android apps bypass the browser entirely. On iOS, <code>ASAuthorizationController</code> creates and asserts passkeys directly through the Secure Enclave; on Android, the <code>CredentialManager</code> API handles the same via Google Password Manager. In both cases the public key and assertion are structurally identical to their WebAuthn browser equivalents and work against the same on-chain verifier contract. The compatibility matrix will include a native bridge section documenting the exact formatting differences and how to submit the resulting payload to the Soroban contract from React Native, Flutter, or native Swift and Kotlin.</p>
+
 <h2>5. Implementation Plan</h2>
 <h3>Approach</h3>
-<p>The existing ecosystem has the hard parts solved at the protocol and contract level (<a href="https://github.com/OpenZeppelin/stellar-contracts" target="_blank">OpenZeppelin stellar-contracts</a>) and at the full-featured SDK level (<a href="https://github.com/kalepail/smart-account-kit" target="_blank">smart-account-kit</a>). What is missing is the minimal, approachable middle layer.</p>
+<p>The existing ecosystem has the hard parts solved at the protocol and contract level (<a style="text-decoration:underline" href="https://github.com/OpenZeppelin/stellar-contracts" target="_blank">OpenZeppelin stellar-contracts</a>) and at the full-featured SDK level (<a style="text-decoration:underline" href="https://github.com/kalepail/smart-account-kit" target="_blank">smart-account-kit</a>). What is missing is the minimal, approachable middle layer.</p>
 <p>The approach is to extract the minimum viable slice from smart-account-kit, just the WebAuthn ceremony and Soroban signature payload construction, and build on top of the already-deployed OpenZeppelin contracts rather than reinventing the on-chain layer. The result is a thin SDK with a narrow API, headless UI components where developers own the styling, and a first-class stellar-wallets-kit connector.</p>
 
 <h3>Architecture</h3>
 <ul>
-  <li><strong><code>passkey-sdk</code></strong>: the core layer. Wraps <a href="https://simplewebauthn.dev/" target="_blank"><code><strong>@simplewebauthn/browser</strong></code></a> for registration and authentication, normalizes encoding differences between Chrome, Safari, and Firefox.</li>
-  <li><strong><code>passkey-ui</code></strong>: headless Web Components. Each component handles state (loading, error, success) and emits typed events, but ships with no opinion on styling.</li>
-  <li><strong><code>wallets-kit-adapter</code></strong>: the connector. Implements the <a href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank"><code>@creit-tech/stellar-wallets-kit</code></a> module interface: <code>getAddress()</code>, <code>signTransaction()</code>, <code>isAvailable()</code>. The goal is a PR into the official repo so passkeys appear as a native wallet option alongside Freighter, Lobstr, and xBull.</li>
-  <li><strong><code>demo</code></strong>: exercises the full flow end-to-end via the wallets-kit adapter: create smart wallet, register passkey, sign a Soroban transaction, recover via backup key.</li>
+  <li><strong><code>passkey-sdk</code></strong>: the core layer. Wraps <a style="text-decoration:underline" href="https://simplewebauthn.dev/" target="_blank"><code><strong>@simplewebauthn/browser</strong></code></a> for registration and authentication, normalizes encoding differences between Chrome, Safari, and Firefox. The SDK does not touch or modify the on-chain verifier contracts; it only formats WebAuthn authentication data into the payload structure the verifier expects, so there is no risk of introducing new attack surface at the contract level.</li>
+  <li><strong><code>passkey-ui</code></strong>: three headless Web Components covering the three core flows: <code>&lt;pk-create&gt;</code>, <code>&lt;pk-sign-tx&gt;</code>, and <code>&lt;pk-recover&gt;</code>. Each component manages the WebAuthn ceremony and emits typed events on completion, but ships with zero opinion on visual styling. For <code>&lt;pk-sign-tx&gt;</code> in particular, the developer owns the transaction summary view (what the user sees before confirming) while the component handles only the signing ceremony underneath. A single build works in React, Vue, Svelte, and vanilla JS without any adapter shim.</li>
+  <li><strong><code>wallets-kit-adapter</code></strong>: the connector. Implements the <a style="text-decoration:underline" href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank"><code>@creit-tech/stellar-wallets-kit</code></a> module interface: <code>getAddress()</code>, <code>signTransaction()</code>, <code>isAvailable()</code>. The goal is a PR into the official repo so passkeys appear as a native wallet option alongside Freighter, Lobstr, and xBull.</li>
+  <li><strong><code>demo</code></strong>: exercises the full flow end-to-end via the wallets-kit adapter using all three components: create passkey (<code>&lt;pk-create&gt;</code>), sign a Soroban transaction (<code>&lt;pk-sign-tx&gt;</code>), and recover via backup key (<code>&lt;pk-recover&gt;</code>).</li>
 </ul>
 
 <h3>Stellar Wallets Kit - Prior Engagement and Specification Alignment</h3>
-<p>We have already opened discussions with the Creit Tech team (maintainers of <a href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank"><code>@creit-tech/stellar-wallets-kit</code></a>) to validate the adapter interface before implementation begins:</p>
+<p>We have already opened discussions with the Creit Tech team (maintainers of <a style="text-decoration:underline" href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank"><code>@creit-tech/stellar-wallets-kit</code></a>) to validate the adapter interface before implementation begins:</p>
 <ul>
-  <li> <a href="https://github.com/Creit-Tech/Stellar-Wallets-Kit/issues/91" target="_blank"><strong>Stellar-Wallets-Kit/issues/91</strong></a>: Raised to discuss adding a first-class passkey module to the kit, including the interface contract (<code>getAddress</code>, <code>signTransaction</code>, <code>isAvailable</code>) and how credential identity maps to wallet address derivation.</li>
-  <li> <a href="https://discord.com/channels/897514728459468821/1250851135561142423/1511354460251750562" target="_blank"><strong>Discord Discussion thread</strong></a>: Follow-up coordination in the Stellar developer community Discord confirming the approach and getting early feedback from the ecosystem.</li>
+  <li> <a style="text-decoration:underline" href="https://github.com/Creit-Tech/Stellar-Wallets-Kit/issues/91" target="_blank"><strong>Stellar-Wallets-Kit/issues/91</strong></a>: Raised to discuss adding a first-class passkey module to the kit, including the interface contract (<code>getAddress</code>, <code>signTransaction</code>, <code>isAvailable</code>) and how credential identity maps to wallet address derivation.</li>
+  <li> <a style="text-decoration:underline" href="https://discord.com/channels/897514728459468821/1250851135561142423/1511354460251750562" target="_blank"><strong>Discord Discussion thread</strong></a>: Follow-up coordination in the Stellar developer community Discord confirming the approach and getting early feedback from the ecosystem.</li>
 </ul>
-<p>The implementation will follow the <code>IStellarWalletsKit</code> module specification exactly, meaning any dApp already using <a href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank">stellar-wallets-kit</a> can add passkey support by registering the adapter - no changes to their signing flow required.</p>
+<p>The implementation will follow the <code>IStellarWalletsKit</code> module specification exactly, meaning any dApp already using <a style="text-decoration:underline" href="https://github.com/Creit-Tech/Stellar-Wallets-Kit" target="_blank">stellar-wallets-kit</a> can add passkey support by registering the adapter - no changes to their signing flow required.</p>
 
 <h3>Key Technical Decisions</h3>
 <table>
@@ -145,12 +148,21 @@ const RFP_HTML = `
     <tr><th>Decision</th><th>Choice</th><th>Reason</th></tr>
   </thead>
   <tbody>
-    <tr><td>On-chain contracts</td><td><a href="https://github.com/OpenZeppelin/stellar-contracts" target="_blank"><strong>OpenZeppelin stellar-contracts</strong></a></td><td>Already deployed, partially audited, modular verifiers</td></tr>
-    <tr><td>WebAuthn library</td><td><a href="https://simplewebauthn.dev/" target="_blank"><strong>@simplewebauthn/browser</strong></a></td><td>Smallest proven abstraction; normalizes browser differences</td></tr>
-    <tr><td>UI approach</td><td>Headless Web Components</td><td>Framework-agnostic; developer owns styling</td></tr>
+    <tr><td>On-chain contracts</td><td><a style="text-decoration:underline" href="https://github.com/OpenZeppelin/stellar-contracts" target="_blank"><strong>OpenZeppelin stellar-contracts</strong></a></td><td>Already deployed, partially audited, modular verifiers</td></tr>
+    <tr><td>WebAuthn library</td><td><a style="text-decoration:underline" href="https://simplewebauthn.dev/" target="_blank"><strong>@simplewebauthn/browser</strong></a></td><td>Smallest proven abstraction; normalizes browser differences</td></tr>
+    <tr><td>UI approach</td><td>Headless Web Components</td><td>Framework-agnostic, works in React, Vue, Svelte, and vanilla JS with one build; developer owns styling</td></tr>
     <tr><td>Test framework</td><td>Vitest</td><td>Fast; native ESM; TypeScript-native</td></tr>
+    <tr><td>License</td><td>MIT</td><td>Permissive; compatible with all downstream wallet integrations</td></tr>
   </tbody>
 </table>
+
+<h3>smart-account-kit / Tyler Ianiro: Prior Coordination</h3>
+<p>We have been in active discussions with Tyler Ianiro (author of <a style="text-decoration:underline" href="https://github.com/kalepail/smart-account-kit" target="_blank"><code>smart-account-kit</code></a>) to align scope and avoid duplication before implementation begins:</p>
+<ul>
+  <li><a style="text-decoration:underline" href="https://discord.com/channels/897514728459468821/1250851135561142423/1511354460251750562" target="_blank"><strong>Discord discussion</strong></a>: Coordination in the Stellar developer Discord on scope boundaries, confirming that our layer (UI components and stellar-wallets-kit adapter) sits above smart-account-kit rather than duplicating its on-chain logic.</li>
+  <li><a style="text-decoration:underline" href="https://github.com/kalepail/smart-account-kit/issues/10" target="_blank"><strong>smart-account-kit/issues/10</strong></a>: Open issue tracking integration points between the two projects, ensuring both evolve in a compatible direction.</li>
+</ul>
+<p>Our deliverable consumes smart-account-kit as a dependency for the on-chain ceremony and adds the missing UI and adapter layer on top. The two projects are complementary with no functional overlap.</p>
 
 <h3>Timeline</h3>
 <table>
@@ -158,14 +170,15 @@ const RFP_HTML = `
     <tr><th>Month</th><th>Focus</th><th>Deliverables</th></tr>
   </thead>
   <tbody>
-    <tr><td>Month 1</td><td>Research and start building</td><td>compatibility-matrix.md and usage-patterns.md tested on real devices</td></tr>
-    <tr><td>Month 2</td><td>PR to stellar-wallet-kit</td><td>Work with stellar-wallet-kit team to implement</td></tr>
-    <tr><td>Month 3</td><td>Testing</td><td>Talk to dApp teams to test out the solution</td></tr>
+    <tr><td>Month 1</td><td>Research</td><td><code>docs/compatibility-matrix.md</code> and <code>docs/usage-patterns.md</code> tested on real devices. Matrix rows carry <em>Last tested</em> dates and a defined re-test cadence (quarterly + per major browser release).</td></tr>
+    <tr><td>Month 2</td><td>Core SDK + UI components</td><td><code>passkey-sdk</code> core package with full Vitest suite; <code>passkey-ui</code> Web Component set (<code>&lt;pk-create&gt;</code>, <code>&lt;pk-sign-tx&gt;</code>, <code>&lt;pk-recover&gt;</code>). All packages published to npm under MIT license.</td></tr>
+    <tr><td>Month 3</td><td>stellar-wallets-kit integration</td><td><code>wallets-kit-adapter</code> implementing the <code>IStellarWalletsKit</code> module interface. PR raised against the official stellar-wallets-kit repo. Integration tested with Meridian Pay and Freighter teams.</td></tr>
+    <tr><td>Month 4</td><td>Delivery</td><td>End-to-end demo live on Testnet. Public blog post on passkey compatibility learnings. All docs finalized and merged into wallet-kit repo. Ongoing maintenance: out-of-cycle update PRs within two weeks of any breaking change in smart-account-kit or WebAuthn platform APIs.</td></tr>
   </tbody>
 </table>
 
 <h2>6. About the Team</h2>
-<p> <a href="https://smartcloudsolutions.tech/" target="_blank"><strong>SmartCloud Solutions</strong></a> is a three-person engineering team that builds production systems for blockchain protocols, agent infrastructure, and developer tooling with a focus on SDKs, Kubernetes-native platforms, and cross-chain protocol work.</p>
+<p> <a style="text-decoration:underline" href="https://smartcloudsolutions.tech/" target="_blank"><strong>SmartCloud Solutions</strong></a> is a three-person engineering team that builds production systems for blockchain protocols, agent infrastructure, and developer tooling with a focus on SDKs, Kubernetes-native platforms, and cross-chain protocol work.</p>
 
 <h3>Rohit Aggarwal: Founder / CTO, Web3 Protocols</h3>
 <p>Rohit is the Founder/CTO of <strong>Raga Finance</strong> and <strong>Nexus Network</strong>. He previously led EVM development at <strong>pSTAKE Finance</strong>, building liquid staking on BNB/Ethereum and cross-chain L2 staking via LayerZero. He is an alumnus of <strong>IIT Bombay</strong> and has deep experience designing minimal, production-quality protocol SDKs and smart contract systems.</p>
@@ -179,15 +192,17 @@ const RFP_HTML = `
 <p>Arham is a Senior Blockchain Developer and alumnus of <strong>IIT Jodhpur</strong> (B.Tech Electrical Engineering). He has five years of experience shipping production blockchain infrastructure across multiple protocols spanning Cosmos, EVM, and Rust-based chains including SDK development from scratch, smart contract systems, and blockchain transaction pipelines. He will contribute across the full stack on this project.</p>
 
 <h2>7. Milestone Breakdown</h2>
-<p>SCF Build Award is milestone-based with funding split across tranches tied to specific, verifiable deliverables.</p>
+<p>Total ask: <strong>$90,000</strong>, disbursed across four tranches. M2 (SDK + UI) is a prerequisite for M3 but shares that tranche, ensuring the integration payment only releases once the full stack is reviewable end-to-end.</p>
 <table>
   <thead>
     <tr><th>Milestone</th><th>Deliverable</th><th>Verification</th><th>Funding</th></tr>
   </thead>
   <tbody>
-    <tr><td><strong>M1</strong> Research Document</td><td>docs/compatibility-matrix.md and docs/usage-patterns.md published in the repo. Matrix covers all browser/OS/hardware combinations, tested on real devices.</td><td>Reviewers can inspect the matrix, reproduce test cases, and verify coverage</td><td>Tranche 1</td></tr>
-    <tr><td><strong>M2</strong> Passkey SDK</td><td>Package delivered and PR raised with stellar-wallet-kit</td><td>npm install + run tests; read API docs</td><td>Tranche 2</td></tr>
-    <tr><td><strong>M3</strong> Delivery</td><td>All docs finalized. Public blog post published summarizing passkey compatibility learnings. Full demo working on Testnet.</td><td>End-to-end demo walkthrough; blog post live</td><td></td></tr>
+    <tr><td><strong>Grant Approval</strong></td><td>Project kickoff. Repository created, initial scaffolding published, team onboarded to SCF tooling.</td><td>Repo publicly visible; initial commit present</td><td><strong>$10,000</strong></td></tr>
+    <tr><td><strong>M1</strong> Research</td><td><code>docs/compatibility-matrix.md</code> and <code>docs/usage-patterns.md</code> published in the repo. Matrix covers all browser/OS/hardware combinations tested on real devices. Each row carries a <em>Last tested</em> date. Maintenance process documented: quarterly re-test cadence, per-browser-release updates, ownership transfer to wallet-kit maintainers at M3.</td><td>Reviewers can inspect the matrix, reproduce test cases on listed devices, and verify Last tested dates are current</td><td><strong>$15,000</strong></td></tr>
+    <tr><td><strong>M2</strong> SDK + UI Components</td><td><code>passkey-sdk</code> core package (WebAuthn registration, authentication, Soroban payload construction) with full Vitest test suite. <code>passkey-ui</code> headless Web Component set (<code>&lt;pk-create&gt;</code>, <code>&lt;pk-sign-tx&gt;</code>, <code>&lt;pk-recover&gt;</code>). All packages published to npm under MIT license with API documentation.</td><td><code>npm install</code> + run tests pass; Web Components render and emit events in a vanilla HTML page; API docs readable</td><td><strong>$15,000</strong></td></tr>
+    <tr><td><strong>M3</strong> wallet-kit Integration</td><td><code>wallets-kit-adapter</code> implementing the full <code>IStellarWalletsKit</code> module interface (<code>getAddress</code>, <code>signTransaction</code>, <code>isAvailable</code>). PR raised against the official stellar-wallets-kit repo. Docs and compatibility matrix merged into the wallet-kit repo under a community-owned path, so the Stellar ecosystem retains the material after the grant ends. Integration validated with Meridian Pay and Freighter teams.</td><td>PR open and passing CI in stellar-wallets-kit repo; passkey option appears alongside Freighter and Lobstr in the kit; integration confirmed by at least one wallet team</td><td><strong>$15,000</strong></td></tr>
+    <tr><td><strong>M4</strong> Delivery + Maintenance</td><td>End-to-end demo live on Testnet. Public blog post summarizing passkey compatibility learnings. Ongoing maintenance for the first year: quarterly compatibility re-tests, out-of-cycle update PRs within two weeks of any breaking change in smart-account-kit or WebAuthn platform APIs, and support for wallet teams integrating the adapter.</td><td>Demo URL live and walkthrough-able; blog post published; maintenance commitment documented in repo CONTRIBUTING.md</td><td><strong>$35,000</strong></td></tr>
   </tbody>
 </table>
 `
