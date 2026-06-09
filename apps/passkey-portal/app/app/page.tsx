@@ -170,13 +170,22 @@ export default function AppPage() {
           <SealLogo size={34} bgColor="#060d1f" ringColor="rgba(59,130,246,0.6)" textColor="rgba(255,255,255,0.8)" />
           <span className="text-sm font-bold tracking-wide text-white hidden md:block">SEALPASS</span>
         </div>
-        <button
-          onClick={handleDisconnect}
-          className="text-sm px-4 py-1.5 rounded-lg border font-medium transition-all"
-          style={{ color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.1)' }}
-        >
-          Disconnect
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push('/architecture')}
+            className="text-sm px-4 py-1.5 rounded-lg border font-medium transition-all"
+            style={{ color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.1)' }}
+          >
+            Architecture
+          </button>
+          <button
+            onClick={handleDisconnect}
+            className="text-sm px-4 py-1.5 rounded-lg border font-medium transition-all"
+            style={{ color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.1)' }}
+          >
+            Disconnect
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 px-4 md:px-8 py-6 max-w-4xl mx-auto w-full">
