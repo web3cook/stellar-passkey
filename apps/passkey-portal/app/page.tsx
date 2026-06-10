@@ -104,6 +104,15 @@ export default function LandingPage() {
       className="min-h-screen flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden"
       style={{ background: 'radial-gradient(ellipse at 50% 0%, #1e3a8a 0%, #0a1628 45%, #060d1f 100%)' }}
     >
+      {/* Docs link */}
+      <a
+        href="/docs"
+        className="absolute top-4 right-4 md:top-6 md:right-8 z-20 text-sm px-4 py-1.5 rounded-lg border font-medium transition-all"
+        style={{ color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(6,13,31,0.5)' }}
+      >
+        Docs
+      </a>
+
       {/* Subtle glow behind logo */}
       <div
         className="absolute pointer-events-none"
@@ -133,7 +142,7 @@ export default function LandingPage() {
 
         {/* Disclaimer */}
         <p className="text-sm text-center w-full px-3 py-2 rounded-lg border" style={{ color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
-          Create a wallet or sign in to read the RFP proposal.
+          Read the <a href="/docs/rfp" style={{ color: '#3b82f6', textDecoration: 'underline' }}>RFP proposal</a> and <a href="/docs/architecture" style={{ color: '#3b82f6', textDecoration: 'underline' }}>architecture docs</a>, or create a wallet to try the demo.
         </p>
 
         {/* CTA cards */}
